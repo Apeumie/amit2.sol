@@ -1,94 +1,52 @@
-📄 README.md — TimeLockVault
-markdown
-Copy
-Edit
-# ⏳ TimeLockVault
-
-A simple Ethereum smart contract that allows users to **deposit ETH with a time lock**, making it withdrawable only after a specified period. Ideal for creating trustless time-based savings or delayed payment systems.
-
----
-
-## 🔐 Features
-
-- Users can deposit ETH and choose how long it will be locked.
-- Only the original depositor can withdraw their funds.
-- Withdrawals are only allowed **after the lock period ends**.
-- Includes a utility function to check remaining lock time.
-
----
-
-## 🛠️ Contract Details
-
-### Solidity Version
-```solidity
+  // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-Contract Name
-TimeLockVault
 
-🚀 Functions
-deposit(uint256 _lockTimeInSeconds)
-Deposits ETH into the contract and locks it for the specified time.
+contract TimeLockVault {
+    struct Deposit {
+        uint256 amount;
+        uint256 unlockTime;
+    }
 
-Params: _lockTimeInSeconds – Number of seconds the ETH will be locked.
+    mapping(address => Deposit) public deposits;
 
-Payable: Yes
+    event Deposited(address indexed user, uint256 amount, uint256 unlockTime);
+    event Withdrawn(address indexed user, uint256 amount);
 
-Example: Lock 1 ETH for 1 minute (60 seconds).
+    // Deposit ETH with a time lock (in seconds)
+    function deposit(uint256 _lockTimeInSeconds) external payable {
+        require(msg.value > 0, "Must deposit some ETH");
+        require(_lockTimeInSeconds > 0, "Lock time must be > 0");
 
-solidity
-Copy
-Edit
-deposit(60) // Attach 1 ETH when calling
-withdraw()
-Withdraws the ETH only if the lock time has passed.
+        deposits[msg.sender] = Deposit({
+            amount: msg.value,
+            unlockTime: block.timestamp + _lockTimeInSeconds
+        });
 
-Reverts if: No deposit or time is still locked.
+        emit Deposited(msg.sender, msg.value, block.timestamp + _lockTimeInSeconds);
+    }
 
-timeLeft(address user) → uint256
-Returns the remaining time (in seconds) until the user's deposit can be withdrawn.
+    // Withdraw ETH after lock time has passed
+    function withdraw() external {
+        Deposit storage userDeposit = deposits[msg.sender];
+        require(userDeposit.amount > 0, "No funds to withdraw");
+        require(block.timestamp >= userDeposit.unlockTime, "Funds are still locked");
 
-⚙️ Events
-Deposited(address user, uint256 amount, uint256 unlockTime)
+        uint256 amount = userDeposit.amount;
+        userDeposit.amount = 0;
+        userDeposit.unlockTime = 0;
 
-Withdrawn(address user, uint256 amount)
+        payable(msg.sender).transfer(amount);
 
-🧪 Testing in Remix
-Go to Remix IDE
+        emit Withdrawn(msg.sender, amount);
+    }
 
-Create a new file TimeLockVault.sol and paste the contract code.
-
-Compile the contract.
-
-Deploy it using the "Deploy & Run Transactions" panel.
-
-Use deposit with some ETH and lock time (e.g., 60 seconds).
-
-Try calling withdraw() before and after 60 seconds.
-
-Use timeLeft() to check remaining lock time.
-
-🔒 Security Considerations
-Each user can only have one active deposit at a time (per address).
-
-Withdraw logic uses a checks-effects-interactions pattern to prevent reentrancy.
-
-Does not support ERC20 tokens — ETH only.
-
-📄 License
-This contract is open-source and licensed under MIT.
-
-yaml
-Copy
-Edit
-
----
-
-Let me know if you'd like me to:
-- Add deployment instructions (e.g. with Hardhat or Foundry)
-- Expand this for an ERC-20 compatible version
-- Include automated tests (JavaScript or Solidity-based)
-
-I can also generate a full GitHub structure for you if you plan to publish this!
-
-contract address-0x9286e1b9eb29280fa759db4ba9e18af37a30b101
+    // View function to check how much time is left
+    function timeLeft(address user) external view returns (uint256) {
+        if (block.timestamp >= deposits[user].unlockTime) {
+            return 0;
+        } else {
+            return deposits[user].unlockTime - block.timestamp;
+        }
+    }
+}
 
